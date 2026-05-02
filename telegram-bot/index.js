@@ -1117,3 +1117,36 @@ async function setChatPermissions(env, chatId, canSend) {
   };
   await fetch(API(env) + '/setChatPermissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, permissions: perms }) });
 }
+
+async function applyMediaPermissions(env, chatId, settings) {
+  const ml = settings.media_lock;
+  const noOther = ml.sticker || ml.gif;
+  const perms = {
+    can_send_messages: true,
+    can_send_photos: !ml.photo,
+    can_send_videos: !ml.video,
+    can_send_audios: !ml.audio,
+    can_send_documents: !ml.document,
+    can_send_voice_notes: !ml.audio,
+    can_send_video_notes: !ml.video,
+    can_send_other_messages: !noOther,
+    can_add_web_page_previews: !settings.links_locked,
+    can_send_polls: true,
+    can_invite_users: true,
+    can_pin_messages: false,
+    can_change_info: false,
+  };
+  await fetch(API(env) + '/setChatPermissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, permissions: perms }) });
+}
+
+function formatMuteExpiry(durSecs) {
+  const endDate = new Date(Date.now() + durSecs * 1000);
+  const h = endDate.getUTCHours() + 3;
+  const hh = ((h % 24) < 10 ? '0' : '') + (h % 24);
+  const mm = (endDate.getUTCMinutes() < 10 ? '0' : '') + endDate.getUTCMinutes();
+  let label = '';
+  if (durSecs < 3600) label = Math.round(durSecs / 60) + ' دقيقة';
+  else if (durSecs < 86400) label = Math.round(durSecs / 3600) + ' ساعة';
+  else label = Math.round(durSecs / 86400) + ' يوم';
+  return { label, time: hh + ':' + mm };
+}
