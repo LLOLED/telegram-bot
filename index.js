@@ -325,19 +325,36 @@ async function handleMessage(msg, env) {
         return;
       }
 
-      // ── انتظار ID مشرف فرعي ───────────────────────────────────────────
-      if (pending.step === 'await_sub_admin_id') {
+      // ── انتظار إحالة رسالة لإضافة مشرف فرعي ────────────────────────
+      if (pending.step === 'await_sub_admin_forward') {
         const gChatId = pending.gChatId;
         if (!await isOwner(env, gChatId, userId)) {
           await setPending(env, userId, null);
           await sendMsg(env, chatId, '❌ هذه الخاصية للمالك فقط.');
           return;
         }
-        const subId = text.trim();
-        if (!/^\d+$/.test(subId)) {
-          await sendMsg(env, chatId, '❌ أرسل ID رقمي صحيح للمستخدم:');
+
+        // محاولة 1: رسالة محالة (forward) من المستخدم
+        let subId   = null;
+        let subName = null;
+        if (msg.forward_from) {
+          subId   = msg.forward_from.id.toString();
+          subName = msg.forward_from.first_name;
+        }
+        // محاولة 2: إدخال ID يدوياً كنص (احتياطي لمن عنده إعدادات خصوصية)
+        else if (/^\d+$/.test(text.trim())) {
+          subId   = text.trim();
+          subName = subId;
+        }
+
+        if (!subId) {
+          await sendMsg(env, chatId,
+            '❌ لم أتمكن من تحديد المستخدم\n\nتأكد أنك أحلت رسالة من الشخص مباشرةً، أو أرسل ID الرقمي:',
+            { inline_keyboard: [[{ text: '❌ إلغاء', callback_data: 'subadmins_' + gChatId }]] }
+          );
           return;
         }
+
         const settings = await getSettings(env, gChatId);
         if (!settings.sub_admins.includes(subId)) {
           settings.sub_admins.push(subId);
@@ -346,10 +363,10 @@ async function handleMessage(msg, env) {
         }
         await setPending(env, userId, null);
         await sendMsg(env, chatId,
-          '✅ تمت إضافة المشرف الفرعي!\n\nID: ' + subId + '\nسيتمكن من إدارة إعدادات البوت في المجموعة.',
+          '✅ تمت إضافة المشرف الفرعي!\n\nالاسم: ' + esc(subName) + '\nID: ' + subId + '\nسيتمكن من إدارة إعدادات البوت في المجموعة.',
           { inline_keyboard: [
             [{ text: '👮 إدارة المشرفين الفرعيين', callback_data: 'subadmins_' + gChatId }],
-            [{ text: '🔙 رجوع للقائمة', callback_data: 'menu_' + gChatId }],
+            [{ text: '🔙 رجوع للقائمة',            callback_data: 'menu_'       + gChatId }],
           ]}
         );
         return;
@@ -808,9 +825,9 @@ async function handleCallback(cb, env) {
     }
     const groups    = await getUserGroups(env, userId);
     const groupName = groups[gChatId.toString()] || gChatId;
-    await setPending(env, userId, { step: 'await_sub_admin_id', gChatId, groupName });
+    await setPending(env, userId, { step: 'await_sub_admin_forward', gChatId, groupName });
     await editMsg(env, chatId, msgId,
-      '👮 إضافة مشرف فرعي\n\nأرسل الـ ID الرقمي للمستخدم:\n\n💡 يمكن معرفة الـ ID عبر بوت @userinfobot',
+      '👮 إضافة مشرف فرعي\n\n📨 أحِل (Forward) أي رسالة من الشخص الذي تريد تعيينه مشرفاً فرعياً إلى هذه المحادثة\n\n💡 إذا كان لديه إعدادات خصوصية تمنع الإحالة، أرسل ID الرقمي مباشرة',
       { inline_keyboard: [[{ text: '❌ إلغاء', callback_data: 'subadmins_' + gChatId }]] }
     );
     return;
@@ -1220,13 +1237,21 @@ async function kickUser(env, chatId, userId) {
 
 async function restrictUser(env, chatId, userId, canSend, duration) {
   const until = duration ? Math.floor(Date.now() / 1000) + duration : 0;
+  // استخدام صلاحيات Bot API 6.0+ الجديدة (كل نوع وسيلة منفصل)
   const perms = {
-    can_send_messages:       canSend,
-    can_send_media_messages: canSend,
-    can_send_other_messages: canSend,
+    can_send_messages:         canSend,
+    can_send_audios:           canSend,
+    can_send_documents:        canSend,
+    can_send_photos:           canSend,
+    can_send_videos:           canSend,
+    can_send_video_notes:      canSend,
+    can_send_voice_notes:      canSend,
+    can_send_polls:            canSend,
+    can_send_other_messages:   canSend,
     can_add_web_page_previews: canSend,
-    can_send_polls:          canSend,
-    can_send_voice_notes:    canSend,
+    can_change_info:           false,
+    can_invite_users:          canSend,
+    can_pin_messages:          false,
   };
   return tgPost(env, 'restrictChatMember', { chat_id: chatId, user_id: userId, permissions: perms, until_date: until });
 }
