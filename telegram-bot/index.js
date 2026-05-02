@@ -482,12 +482,6 @@ async function handleMessage(msg, env) {
       const durSecs = customMins ? customMins * 60 : (settings.default_mute_duration || 3600);
       const until = await restrictUser(env, chatId, reply.from.id, false, durSecs);
       await setMuteData(env, chatId, reply.from.id, until);
-      const fmt = formatMuteExpiry(durSecs);
-      await sendMsg(env, reply.from.id,
-        '🔇 تم كتمك في المجموعة\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time + '\n\nاضغط الزر أدناه لمعرفة الوقت المتبقي بدقة:',
-        { inline_keyboard: [[{ text: '⏱ كم باقي؟', callback_data: 'check_mute_' + chatId + '_' + reply.from.id }]] }
-      ).catch(() => {});
-      await sendMsg(env, chatId, '🔇 تم كتم ' + esc(reply.from.first_name) + ' لمدة ' + fmt.label);
     } else if (cmd === '/unmute' && reply) {
       await restrictUser(env, chatId, reply.from.id, true);
       await sendMsg(env, chatId, 'تم فك كتم ' + esc(reply.from.first_name));
@@ -1114,12 +1108,7 @@ async function applyWarning(env, chatId, userId, firstName, settings) {
       const muteDur = settings.default_mute_duration || 3600;
       const until = await restrictUser(env, chatId, userId, false, muteDur);
       await setMuteData(env, chatId, userId, until);
-      const fmt = formatMuteExpiry(muteDur);
-      await sendMsg(env, userId,
-        '🔇 تم كتمك في المجموعة\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time + '\n\nاضغط الزر أدناه لمعرفة الوقت المتبقي بدقة:',
-        { inline_keyboard: [[{ text: '⏱ كم باقي؟', callback_data: 'check_mute_' + chatId + '_' + userId }]] }
-      ).catch(() => {});
-      return '🔇 تم كتم ' + esc(firstName) + ' لمدة ' + fmt.label + ' بعد ' + settings.max_warnings + ' إنذارات';
+      return '';
     }
   }
   return '⚠️ إنذار ' + warns + '/' + settings.max_warnings + ' لـ ' + esc(firstName);
