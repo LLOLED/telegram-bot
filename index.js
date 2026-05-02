@@ -433,12 +433,14 @@ async function handleMessage(msg, env) {
       }
     }
 
-    if (settings.media_lock.photo && msg.photo) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' الصور ممنوعة'); return; }
-    if (settings.media_lock.video && msg.video) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' الفيديو ممنوع'); return; }
-    if (settings.media_lock.sticker && msg.sticker) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' الملصقات ممنوعة'); return; }
-    if (settings.media_lock.audio && (msg.audio || msg.voice)) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' الصوت ممنوع'); return; }
-    if (settings.media_lock.gif && msg.animation) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' GIF ممنوع'); return; }
-    if (settings.media_lock.document && msg.document) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' الملفات ممنوعة'); return; }
+    if (settings.media_lock.photo && msg.photo) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ الصور ممنوعة'); return; }
+    if (settings.media_lock.video && (msg.video || msg.video_note)) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ الفيديو ممنوع'); return; }
+    if (settings.media_lock.sticker && msg.sticker) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ الملصقات ممنوعة'); return; }
+    if (settings.media_lock.audio && msg.audio) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ ملفات الصوت ممنوعة'); return; }
+    if (settings.media_lock.mic && msg.voice) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ رسائل المايك ممنوعة 🎙'); return; }
+    if (settings.media_lock.gif && msg.animation) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ GIF ممنوع'); return; }
+    if (settings.media_lock.document && msg.document) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ الملفات ممنوعة'); return; }
+    if (settings.media_lock.poll && msg.poll) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' ❌ الاستطلاعات ممنوعة 📊'); return; }
     if (settings.anti_forward && (msg.forward_from || msg.forward_from_chat)) { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, esc(msg.from.first_name) + ' التوجيه ممنوع'); return; }
     if (settings.anti_channel && msg.sender_chat) { await deleteMsg(env, chatId, msgId); return; }
 
