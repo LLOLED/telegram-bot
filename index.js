@@ -325,8 +325,8 @@ async function handleMessage(msg, env) {
         return;
       }
 
-      // ── انتظار إحالة رسالة لإضافة مشرف فرعي ────────────────────────
-      if (pending.step === 'await_sub_admin_forward') {
+      // ── انتظار @username لإضافة مشرف فرعي ───────────────────────────
+      if (pending.step === 'await_sub_admin_username') {
         const gChatId = pending.gChatId;
         if (!await isOwner(env, gChatId, userId)) {
           await setPending(env, userId, null);
@@ -334,22 +334,35 @@ async function handleMessage(msg, env) {
           return;
         }
 
-        // محاولة 1: رسالة محالة (forward) من المستخدم
-        let subId   = null;
-        let subName = null;
-        if (msg.forward_from) {
-          subId   = msg.forward_from.id.toString();
-          subName = msg.forward_from.first_name;
-        }
-        // محاولة 2: إدخال ID يدوياً كنص (احتياطي لمن عنده إعدادات خصوصية)
-        else if (/^\d+$/.test(text.trim())) {
-          subId   = text.trim();
-          subName = subId;
+        const input    = text.trim().replace(/^@/, '');
+        let subId      = null;
+        let subName    = null;
+        let subUsername = null;
+
+        if (!input) {
+          await sendMsg(env, chatId, '❌ أرسل اسم المستخدم بشكل صحيح مثال: @username');
+          return;
         }
 
-        if (!subId) {
+        // البحث عن المستخدم عبر getChat بالـ @username
+        const userInfo = await getUserByUsername(env, input);
+        if (!userInfo) {
           await sendMsg(env, chatId,
-            '❌ لم أتمكن من تحديد المستخدم\n\nتأكد أنك أحلت رسالة من الشخص مباشرةً، أو أرسل ID الرقمي:',
+            '❌ لم يُعثر على المستخدم @' + input + '\n\nتأكد من صحة الـ username وأنه مسجّل في تيليغرام.',
+            { inline_keyboard: [[{ text: '❌ إلغاء', callback_data: 'subadmins_' + gChatId }]] }
+          );
+          return;
+        }
+
+        subId       = userInfo.id.toString();
+        subName     = userInfo.first_name || input;
+        subUsername = userInfo.username   || input;
+
+        // التحقق أن الشخص موجود في المجموعة
+        const memberInfo = await getChatMember(env, parseInt(gChatId), userInfo.id);
+        if (!memberInfo || memberInfo.status === 'left' || memberInfo.status === 'kicked') {
+          await sendMsg(env, chatId,
+            '❌ المستخدم @' + subUsername + ' ليس عضواً في المجموعة.\n\nيجب أن يكون موجوداً في المجموعة أولاً.',
             { inline_keyboard: [[{ text: '❌ إلغاء', callback_data: 'subadmins_' + gChatId }]] }
           );
           return;
@@ -359,11 +372,11 @@ async function handleMessage(msg, env) {
         if (!settings.sub_admins.includes(subId)) {
           settings.sub_admins.push(subId);
           await saveSettings(env, gChatId, settings);
-          await addUserGroup(env, parseInt(subId), gChatId, pending.groupName || gChatId);
+          await addUserGroup(env, userInfo.id, gChatId, pending.groupName || gChatId);
         }
         await setPending(env, userId, null);
         await sendMsg(env, chatId,
-          '✅ تمت إضافة المشرف الفرعي!\n\nالاسم: ' + esc(subName) + '\nID: ' + subId + '\nسيتمكن من إدارة إعدادات البوت في المجموعة.',
+          '✅ تمت إضافة المشرف الفرعي!\n\nالاسم: ' + esc(subName) + '\nالمعرّف: @' + subUsername + '\nID: ' + subId,
           { inline_keyboard: [
             [{ text: '👮 إدارة المشرفين الفرعيين', callback_data: 'subadmins_' + gChatId }],
             [{ text: '🔙 رجوع للقائمة',            callback_data: 'menu_'       + gChatId }],
@@ -825,9 +838,9 @@ async function handleCallback(cb, env) {
     }
     const groups    = await getUserGroups(env, userId);
     const groupName = groups[gChatId.toString()] || gChatId;
-    await setPending(env, userId, { step: 'await_sub_admin_forward', gChatId, groupName });
+    await setPending(env, userId, { step: 'await_sub_admin_username', gChatId, groupName });
     await editMsg(env, chatId, msgId,
-      '👮 إضافة مشرف فرعي\n\n📨 أحِل (Forward) أي رسالة من الشخص الذي تريد تعيينه مشرفاً فرعياً إلى هذه المحادثة\n\n💡 إذا كان لديه إعدادات خصوصية تمنع الإحالة، أرسل ID الرقمي مباشرة',
+      '👮 إضافة مشرف فرعي\n\nأرسل معرّف الشخص الذي تريد تعيينه:\n\nمثال: @HJKL818\n\n💡 يجب أن يكون الشخص عضواً في المجموعة',
       { inline_keyboard: [[{ text: '❌ إلغاء', callback_data: 'subadmins_' + gChatId }]] }
     );
     return;
@@ -1210,6 +1223,18 @@ async function unpinMessage(env, chatId, msgId) {
 
 async function answerCb(env, id) {
   return tgPost(env, 'answerCallbackQuery', { callback_query_id: id });
+}
+
+async function getUserByUsername(env, username) {
+  try {
+    const r = await fetch(API(env) + '/getChat', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ chat_id: '@' + username }),
+    });
+    const d = await r.json();
+    return d.ok ? d.result : null;
+  } catch { return null; }
 }
 
 async function getChatMember(env, chatId, userId) {
