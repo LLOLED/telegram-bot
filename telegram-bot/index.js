@@ -479,9 +479,9 @@ async function handleMessage(msg, env) {
     } else if (cmd === '/mute' && reply) {
       const customMins = parseInt(parts[1]);
       const durSecs = customMins ? customMins * 60 : (settings.default_mute_duration || 3600);
-      const durMins = Math.round(durSecs / 60);
       await restrictUser(env, chatId, reply.from.id, false, durSecs);
-      await sendMsg(env, chatId, 'تم كتم ' + esc(reply.from.first_name) + ' لمدة ' + durMins + ' دقيقة');
+      const fmt = formatMuteExpiry(durSecs);
+      await sendMsg(env, chatId, '🔇 تم كتم ' + esc(reply.from.first_name) + '\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time);
     } else if (cmd === '/unmute' && reply) {
       await restrictUser(env, chatId, reply.from.id, true);
       await sendMsg(env, chatId, 'تم فك كتم ' + esc(reply.from.first_name));
@@ -798,12 +798,12 @@ async function handleCallback(cb, env) {
     ['tchannel_' + gChatId]: () => { settings.anti_channel = !settings.anti_channel; return () => showProtectMenu(env, chatId, msgId, gChatId, settings); },
     ['twarns_' + gChatId]: () => { settings.warnings_enabled = !settings.warnings_enabled; return () => showWarnsMenu(env, chatId, msgId, gChatId, settings); },
     ['tnight_' + gChatId]: () => { settings.night_mode.enabled = !settings.night_mode.enabled; return () => showNightMenu(env, chatId, msgId, gChatId, settings); },
-    ['tphoto_' + gChatId]: () => { settings.media_lock.photo = !settings.media_lock.photo; return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tvideo_' + gChatId]: () => { settings.media_lock.video = !settings.media_lock.video; return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tsticker_' + gChatId]: () => { settings.media_lock.sticker = !settings.media_lock.sticker; return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['taudio_' + gChatId]: () => { settings.media_lock.audio = !settings.media_lock.audio; return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tgif_' + gChatId]: () => { settings.media_lock.gif = !settings.media_lock.gif; return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tdoc_' + gChatId]: () => { settings.media_lock.document = !settings.media_lock.document; return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
+    ['tphoto_' + gChatId]: () => { settings.media_lock.photo = !settings.media_lock.photo; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tvideo_' + gChatId]: () => { settings.media_lock.video = !settings.media_lock.video; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tsticker_' + gChatId]: () => { settings.media_lock.sticker = !settings.media_lock.sticker; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['taudio_' + gChatId]: () => { settings.media_lock.audio = !settings.media_lock.audio; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tgif_' + gChatId]: () => { settings.media_lock.gif = !settings.media_lock.gif; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tdoc_' + gChatId]: () => { settings.media_lock.document = !settings.media_lock.document; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
   };
 
   if (data.startsWith('wmax_')) {
@@ -1029,7 +1029,7 @@ async function applyWarning(env, chatId, userId, firstName, settings) {
     await setWarnings(env, chatId, userId, 0);
     if (settings.warn_action === 'ban') { await banUser(env, chatId, userId); return 'تم حظر ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
     if (settings.warn_action === 'kick') { await kickUser(env, chatId, userId); return 'تم طرد ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
-    if (settings.warn_action === 'mute') { const muteDur = settings.default_mute_duration || 3600; await restrictUser(env, chatId, userId, false, muteDur); return 'تم كتم ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
+    if (settings.warn_action === 'mute') { const muteDur = settings.default_mute_duration || 3600; await restrictUser(env, chatId, userId, false, muteDur); const fmt = formatMuteExpiry(muteDur); return '🔇 تم كتم ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time; }
   }
   return '⚠️ إنذار ' + warns + '/' + settings.max_warnings + ' لـ ' + esc(firstName);
 }
