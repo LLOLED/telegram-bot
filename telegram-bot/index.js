@@ -16,7 +16,7 @@ function defaultSettings() {
   return {
     links_locked: false,
     group_locked: false,
-    media_lock: { photo: false, video: false, sticker: false, audio: false, gif: false, document: false },
+    media_lock: { photo: false, video: false, sticker: false, audio: false, mic: false, gif: false, document: false, poll: false },
     warnings_enabled: true,
     max_warnings: 3,
     warn_action: 'kick',
