@@ -1297,7 +1297,11 @@ async function setChatPermissions(env, chatId, canSend) {
     can_pin_messages:          false,
     can_change_info:           false,
   };
-  return tgPost(env, 'setChatPermissions', { chat_id: chatId, permissions: perms });
+  return tgPost(env, 'setChatPermissions', {
+    chat_id: chatId,
+    permissions: perms,
+    use_independent_chat_permissions: true,
+  });
 }
 
 // تطبيق قفل الوسائط على صلاحيات المجموعة مباشرة (Bot API 6.0+)
@@ -1321,5 +1325,9 @@ async function applyMediaPermissions(env, chatId, settings) {
     can_pin_messages:          false,
     can_change_info:           false,
   };
-  return tgPost(env, 'setChatPermissions', { chat_id: chatId, permissions: perms });
+  return tgPost(env, 'setChatPermissions', {
+    chat_id: chatId,
+    permissions: perms,
+    use_independent_chat_permissions: true,
+  });
 }
