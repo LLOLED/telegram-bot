@@ -479,9 +479,14 @@ async function handleMessage(msg, env) {
     } else if (cmd === '/mute' && reply) {
       const customMins = parseInt(parts[1]);
       const durSecs = customMins ? customMins * 60 : (settings.default_mute_duration || 3600);
-      await restrictUser(env, chatId, reply.from.id, false, durSecs);
+      const until = await restrictUser(env, chatId, reply.from.id, false, durSecs);
+      await setMuteData(env, chatId, reply.from.id, until);
       const fmt = formatMuteExpiry(durSecs);
-      await sendMsg(env, chatId, '🔇 تم كتم ' + esc(reply.from.first_name) + '\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time);
+      await sendMsg(env, reply.from.id,
+        '🔇 تم كتمك في المجموعة\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time + '\n\nاضغط الزر أدناه لمعرفة الوقت المتبقي بدقة:',
+        { inline_keyboard: [[{ text: '⏱ كم باقي؟', callback_data: 'check_mute_' + chatId + '_' + reply.from.id }]] }
+      ).catch(() => {});
+      await sendMsg(env, chatId, '🔇 تم كتم ' + esc(reply.from.first_name) + ' لمدة ' + fmt.label);
     } else if (cmd === '/unmute' && reply) {
       await restrictUser(env, chatId, reply.from.id, true);
       await sendMsg(env, chatId, 'تم فك كتم ' + esc(reply.from.first_name));
@@ -526,6 +531,25 @@ async function handleCallback(cb, env) {
       await restrictUser(env, parseInt(targetChat), parseInt(targetId), true);
       await deleteMsg(env, chatId, msgId);
       await sendMsg(env, parseInt(targetChat), 'مرحباً ' + esc(cb.from.first_name) + ' تم التحقق بنجاح ✅');
+    }
+    return;
+  }
+
+  // ── عداد الكتم الحي ───────────────────────────────────────────────────────
+  if (data.startsWith('check_mute_')) {
+    const parts = data.replace('check_mute_', '').split('_');
+    const mChatId = parts[0];
+    const mUserId = parts[1];
+    if (userId.toString() !== mUserId) { await answerCb(env, cb.id); return; }
+    const untilTs = await getMuteUntil(env, mChatId, userId);
+    const now = Math.floor(Date.now() / 1000);
+    if (!untilTs || untilTs <= now) {
+      await answerCb(env, cb.id, '✅ انتهى الكتم! يمكنك الكتابة الآن.', true);
+    } else {
+      const rem = untilTs - now;
+      const mins = Math.floor(rem / 60);
+      const secs = rem % 60;
+      await answerCb(env, cb.id, '⏱ باقي على انتهاء الكتم:\n' + mins + ' دقيقة و ' + secs + ' ثانية\n\n🕐 ينتهي الساعة: ' + formatMuteExpiry(rem).time, true);
     }
     return;
   }
@@ -1029,7 +1053,17 @@ async function applyWarning(env, chatId, userId, firstName, settings) {
     await setWarnings(env, chatId, userId, 0);
     if (settings.warn_action === 'ban') { await banUser(env, chatId, userId); return 'تم حظر ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
     if (settings.warn_action === 'kick') { await kickUser(env, chatId, userId); return 'تم طرد ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
-    if (settings.warn_action === 'mute') { const muteDur = settings.default_mute_duration || 3600; await restrictUser(env, chatId, userId, false, muteDur); const fmt = formatMuteExpiry(muteDur); return '🔇 تم كتم ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time; }
+    if (settings.warn_action === 'mute') {
+      const muteDur = settings.default_mute_duration || 3600;
+      const until = await restrictUser(env, chatId, userId, false, muteDur);
+      await setMuteData(env, chatId, userId, until);
+      const fmt = formatMuteExpiry(muteDur);
+      await sendMsg(env, userId,
+        '🔇 تم كتمك في المجموعة\n⏱ المدة: ' + fmt.label + '\n🕐 ينتهي الكتم الساعة: ' + fmt.time + '\n\nاضغط الزر أدناه لمعرفة الوقت المتبقي بدقة:',
+        { inline_keyboard: [[{ text: '⏱ كم باقي؟', callback_data: 'check_mute_' + chatId + '_' + userId }]] }
+      ).catch(() => {});
+      return '🔇 تم كتم ' + esc(firstName) + ' لمدة ' + fmt.label + ' بعد ' + settings.max_warnings + ' إنذارات';
+    }
   }
   return '⚠️ إنذار ' + warns + '/' + settings.max_warnings + ' لـ ' + esc(firstName);
 }
@@ -1075,8 +1109,23 @@ async function unpinMessage(env, chatId, msgId) {
   await fetch(API(env) + '/unpinChatMessage', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, message_id: msgId }) });
 }
 
-async function answerCb(env, id) {
-  await fetch(API(env) + '/answerCallbackQuery', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ callback_query_id: id }) });
+async function answerCb(env, id, text, showAlert) {
+  const body = { callback_query_id: id };
+  if (text) { body.text = text; body.show_alert = !!showAlert; }
+  await fetch(API(env) + '/answerCallbackQuery', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+}
+
+async function setMuteData(env, chatId, userId, untilTimestamp) {
+  try {
+    await env.USER_DATA.put('mute_' + chatId + '_' + userId, untilTimestamp.toString(), { expirationTtl: TTL });
+  } catch {}
+}
+
+async function getMuteUntil(env, chatId, userId) {
+  try {
+    const d = await env.USER_DATA.get('mute_' + chatId + '_' + userId);
+    return d ? parseInt(d) : null;
+  } catch { return null; }
 }
 
 async function getChatMember(env, chatId, userId) {
@@ -1102,6 +1151,7 @@ async function restrictUser(env, chatId, userId, canSend, duration) {
   const until = duration ? Math.floor(Date.now() / 1000) + duration : 0;
   const perms = { can_send_messages: canSend, can_send_media_messages: canSend, can_send_other_messages: canSend, can_add_web_page_previews: canSend };
   await fetch(API(env) + '/restrictChatMember', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, user_id: userId, permissions: perms, until_date: until }) });
+  return until;
 }
 
 async function setChatPermissions(env, chatId, canSend) {
