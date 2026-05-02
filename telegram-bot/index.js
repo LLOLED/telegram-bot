@@ -30,6 +30,7 @@ function defaultSettings() {
     anti_forward: false,
     sub_admins: [],
     default_mute_duration: 3600,
+    slow_mode_delay: 0,
   };
 }
 
@@ -543,13 +544,25 @@ async function handleCallback(cb, env) {
     if (userId.toString() !== mUserId) { await answerCb(env, cb.id); return; }
     const untilTs = await getMuteUntil(env, mChatId, userId);
     const now = Math.floor(Date.now() / 1000);
+    await answerCb(env, cb.id);
     if (!untilTs || untilTs <= now) {
-      await answerCb(env, cb.id, '✅ انتهى الكتم! يمكنك الكتابة الآن.', true);
+      await editMsg(env, chatId, msgId,
+        '✅ انتهى الكتم!\nيمكنك الكتابة في المجموعة الآن.'
+      );
     } else {
       const rem = untilTs - now;
-      const mins = Math.floor(rem / 60);
+      const totalMins = Math.floor(rem / 60);
       const secs = rem % 60;
-      await answerCb(env, cb.id, '⏱ باقي على انتهاء الكتم:\n' + mins + ' دقيقة و ' + secs + ' ثانية\n\n🕐 ينتهي الساعة: ' + formatMuteExpiry(rem).time, true);
+      const hours = Math.floor(totalMins / 60);
+      const mins = totalMins % 60;
+      const timeStr = hours > 0
+        ? hours + ':' + (mins < 10 ? '0' : '') + mins + ':' + (secs < 10 ? '0' : '') + secs
+        : mins + ':' + (secs < 10 ? '0' : '') + secs;
+      const endFmt = formatMuteExpiry(rem);
+      await editMsg(env, chatId, msgId,
+        '🔇 أنت مكتوم في المجموعة\n\n⏱ الوقت المتبقي:\n' + timeStr + '\n\n🕐 ينتهي الكتم الساعة: ' + endFmt.time,
+        { inline_keyboard: [[{ text: '🔄 تحديث', callback_data: 'check_mute_' + mChatId + '_' + mUserId }]] }
+      );
     }
     return;
   }
@@ -870,6 +883,7 @@ async function showMainMenu(env, chatId, msgId, gChatId, userId) {
       [{ text: '🌙 الوضع الليلي', callback_data: 'night_' + gChatId }],
       [{ text: '🚫 الكلمات المحظورة', callback_data: 'words_' + gChatId }],
       [{ text: '🔇 إعدادات الكتم', callback_data: 'mute_menu_' + gChatId }],
+      [{ text: '🐢 الوضع البطيء', callback_data: 'slow_menu_' + gChatId }],
       [{ text: '👮 المشرفون الفرعيون', callback_data: 'subadmins_' + gChatId }],
       [{ text: '📌 تثبيت إعلان', callback_data: 'announce_' + gChatId }],
       [{ text: '🔙 رجوع لمجموعاتي', callback_data: 'my_groups' }],
