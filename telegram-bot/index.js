@@ -947,7 +947,8 @@ async function showMediaMenu(env, chatId, msgId, gChatId, s) {
     { inline_keyboard: [
       [{ text: on(s.media_lock.photo) + ' صور', callback_data: 'tphoto_' + gChatId }, { text: on(s.media_lock.video) + ' فيديو', callback_data: 'tvideo_' + gChatId }],
       [{ text: on(s.media_lock.sticker) + ' ملصقات', callback_data: 'tsticker_' + gChatId }, { text: on(s.media_lock.audio) + ' صوت', callback_data: 'taudio_' + gChatId }],
-      [{ text: on(s.media_lock.gif) + ' GIF', callback_data: 'tgif_' + gChatId }, { text: on(s.media_lock.document) + ' ملفات', callback_data: 'tdoc_' + gChatId }],
+      [{ text: on(s.media_lock.mic) + ' مايك 🎙', callback_data: 'tmic_' + gChatId }, { text: on(s.media_lock.gif) + ' GIF', callback_data: 'tgif_' + gChatId }],
+      [{ text: on(s.media_lock.document) + ' ملفات', callback_data: 'tdoc_' + gChatId }, { text: on(s.media_lock.poll) + ' استطلاع 📊', callback_data: 'tpoll_' + gChatId }],
       [{ text: '🔙 رجوع', callback_data: 'menu_' + gChatId }],
     ]}
   );
@@ -1223,11 +1224,11 @@ async function applyMediaPermissions(env, chatId, settings) {
     can_send_videos: !ml.video,
     can_send_audios: !ml.audio,
     can_send_documents: !ml.document,
-    can_send_voice_notes: !ml.audio,
+    can_send_voice_notes: !ml.mic,
     can_send_video_notes: !ml.video,
     can_send_other_messages: !noOther,
     can_add_web_page_previews: !settings.links_locked,
-    can_send_polls: true,
+    can_send_polls: !ml.poll,
     can_invite_users: true,
     can_pin_messages: false,
     can_change_info: false,
