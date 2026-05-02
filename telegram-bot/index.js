@@ -29,6 +29,7 @@ function defaultSettings() {
     anti_channel: false,
     anti_forward: false,
     sub_admins: [],
+    default_mute_duration: 3600,
   };
 }
 
@@ -374,12 +375,14 @@ async function handleMessage(msg, env) {
     if (text === 'قفل') {
       settings.group_locked = true;
       await saveSettings(env, chatId, settings);
+      await setChatPermissions(env, chatId, false);
       await sendMsg(env, chatId,
         '🔒 تم قفل المجموعة\n\nلا يمكن لأي عضو الكتابة الآن.\nأرسل "فتح" لفتحها مرة أخرى.'
       );
     } else {
       settings.group_locked = false;
       await saveSettings(env, chatId, settings);
+      await setChatPermissions(env, chatId, true);
       await sendMsg(env, chatId,
         '🔓 تم فتح المجموعة\n\nيمكن للأعضاء الكتابة الآن.'
       );
@@ -474,9 +477,11 @@ async function handleMessage(msg, env) {
       await kickUser(env, chatId, reply.from.id);
       await sendMsg(env, chatId, 'تم طرد ' + esc(reply.from.first_name));
     } else if (cmd === '/mute' && reply) {
-      const mins = parseInt(parts[1]) || 60;
-      await restrictUser(env, chatId, reply.from.id, false, mins * 60);
-      await sendMsg(env, chatId, 'تم كتم ' + esc(reply.from.first_name) + ' لمدة ' + mins + ' دقيقة');
+      const customMins = parseInt(parts[1]);
+      const durSecs = customMins ? customMins * 60 : (settings.default_mute_duration || 3600);
+      const durMins = Math.round(durSecs / 60);
+      await restrictUser(env, chatId, reply.from.id, false, durSecs);
+      await sendMsg(env, chatId, 'تم كتم ' + esc(reply.from.first_name) + ' لمدة ' + durMins + ' دقيقة');
     } else if (cmd === '/unmute' && reply) {
       await restrictUser(env, chatId, reply.from.id, true);
       await sendMsg(env, chatId, 'تم فك كتم ' + esc(reply.from.first_name));
@@ -660,16 +665,16 @@ async function handleCallback(cb, env) {
 
   // ── Routing ───────────────────────────────────────────────────────────────
 
-  if (data === 'menu_' + gChatId) { await showMainMenu(env, chatId, msgId, gChatId, userId); return; }
-  if (data === 'welcome_' + gChatId) { await showWelcomeMenu(env, chatId, msgId, gChatId, settings); return; }
-  if (data === 'protect_' + gChatId) { await showProtectMenu(env, chatId, msgId, gChatId, settings); return; }
-  if (data === 'media_' + gChatId) { await showMediaMenu(env, chatId, msgId, gChatId, settings); return; }
-  if (data === 'warns_' + gChatId) { await showWarnsMenu(env, chatId, msgId, gChatId, settings); return; }
-  if (data === 'night_' + gChatId) { await showNightMenu(env, chatId, msgId, gChatId, settings); return; }
-  if (data === 'replies_' + gChatId) { await showRepliesMenu(env, chatId, msgId, gChatId, settings); return; }
-  if (data === 'words_' + gChatId) { await showWordsMenu(env, chatId, msgId, gChatId, settings); return; }
-  if (data === 'subadmins_' + gChatId) { await showSubAdminsMenu(env, chatId, msgId, gChatId, settings, userId); return; }
-  if (data === 'mute_menu_' + gChatId) { await showMuteMenu(env, chatId, msgId, gChatId); return; }
+  if (data === 'menu_' + gChatId) { await setPending(env, userId, null); await showMainMenu(env, chatId, msgId, gChatId, userId); return; }
+  if (data === 'welcome_' + gChatId) { await setPending(env, userId, null); await showWelcomeMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'protect_' + gChatId) { await setPending(env, userId, null); await showProtectMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'media_' + gChatId) { await setPending(env, userId, null); await showMediaMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'warns_' + gChatId) { await setPending(env, userId, null); await showWarnsMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'night_' + gChatId) { await setPending(env, userId, null); await showNightMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'replies_' + gChatId) { await setPending(env, userId, null); await showRepliesMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'words_' + gChatId) { await setPending(env, userId, null); await showWordsMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'subadmins_' + gChatId) { await setPending(env, userId, null); await showSubAdminsMenu(env, chatId, msgId, gChatId, settings, userId); return; }
+  if (data === 'mute_menu_' + gChatId) { await setPending(env, userId, null); await showMuteMenu(env, chatId, msgId, gChatId, settings); return; }
 
   // ── إضافة كلمة محظورة ────────────────────────────────────────────────────
   if (data === 'add_word_' + gChatId) {
@@ -752,7 +757,7 @@ async function handleCallback(cb, env) {
     return;
   }
 
-  // ── كتم بمدة محددة ───────────────────────────────────────────────────────
+  // ── كتم بمدة محددة (على مستخدم معين) ────────────────────────────────────
   if (data.startsWith('mute_dur_')) {
     const parts = data.replace('mute_dur_', '').split('_');
     const durSecs = parseInt(parts[0]);
@@ -766,6 +771,20 @@ async function handleCallback(cb, env) {
       '🔇 تم كتم المستخدم لمدة ' + label + ' ✅',
       { inline_keyboard: [[{ text: '🔙 رجوع للقائمة', callback_data: 'menu_' + mGChatId }]] }
     );
+    return;
+  }
+
+  // ── تعيين مدة الكتم الافتراضية ───────────────────────────────────────────
+  if (data.startsWith('mute_def_')) {
+    const withoutPrefix = data.replace('mute_def_', '');
+    const firstUnder = withoutPrefix.indexOf('_');
+    const durSecs = parseInt(withoutPrefix.substring(0, firstUnder));
+    const mGChatId = withoutPrefix.substring(firstUnder + 1);
+    if (!await isAuthorized(env, mGChatId, userId)) return;
+    const mSettings = await getSettings(env, mGChatId);
+    mSettings.default_mute_duration = durSecs;
+    await saveSettings(env, mGChatId, mSettings);
+    await showMuteMenu(env, chatId, msgId, mGChatId, mSettings);
     return;
   }
 
@@ -951,20 +970,24 @@ async function showWordsMenu(env, chatId, msgId, gChatId, s) {
   );
 }
 
-async function showMuteMenu(env, chatId, msgId, gChatId) {
+async function showMuteMenu(env, chatId, msgId, gChatId, s) {
+  const settings = s || await getSettings(env, gChatId);
+  const cur = settings.default_mute_duration || 3600;
+  const labels = { 600: '10 دقائق', 1800: '30 دقيقة', 3600: 'ساعة واحدة', 43200: '12 ساعة', 86400: '24 ساعة' };
+  const sel = (v) => cur === v ? '◀ ' + labels[v] + ' ▶' : labels[v];
   await editMsg(env, chatId, msgId,
-    '🔇 إعدادات الكتم\n\nاختر مدة الكتم الافتراضية عند استخدام أمر /mute بدون تحديد مدة\n\nيمكنك أيضاً كتم بمدة مخصصة بكتابة: /mute 45 (بالدقائق)',
+    '🔇 إعدادات الكتم\n\nالمدة الافتراضية الحالية: ' + (labels[cur] || (cur / 60 + ' دقيقة')) + '\n\nاختر مدة الكتم الافتراضية عند استخدام أمر /mute بدون تحديد مدة\n\nيمكنك أيضاً كتم بمدة مخصصة بكتابة: /mute 45 (بالدقائق)',
     { inline_keyboard: [
       [
-        { text: '10 دقائق', callback_data: 'mute_def_600_' + gChatId },
-        { text: '30 دقيقة', callback_data: 'mute_def_1800_' + gChatId },
+        { text: sel(600), callback_data: 'mute_def_600_' + gChatId },
+        { text: sel(1800), callback_data: 'mute_def_1800_' + gChatId },
       ],
       [
-        { text: 'ساعة واحدة', callback_data: 'mute_def_3600_' + gChatId },
-        { text: '12 ساعة', callback_data: 'mute_def_43200_' + gChatId },
+        { text: sel(3600), callback_data: 'mute_def_3600_' + gChatId },
+        { text: sel(43200), callback_data: 'mute_def_43200_' + gChatId },
       ],
       [
-        { text: '24 ساعة', callback_data: 'mute_def_86400_' + gChatId },
+        { text: sel(86400), callback_data: 'mute_def_86400_' + gChatId },
       ],
       [{ text: '🔙 رجوع', callback_data: 'menu_' + gChatId }],
     ]}
