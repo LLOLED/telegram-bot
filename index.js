@@ -509,16 +509,16 @@ async function handleMessage(msg, env) {
       }
     }
 
-    // ── قفل الوسائط ──────────────────────────────────────────────────────
+    // ── قفل الوسائط — حذف صامت (Telegram يمنع الإرسال مسبقاً عبر setChatPermissions)
     const ml = settings.media_lock;
-    if (ml.photo    && msg.photo)                       { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ الصور ممنوعة');            return; }
-    if (ml.video    && (msg.video || msg.video_note))   { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ الفيديو ممنوع');           return; }
-    if (ml.sticker  && msg.sticker)                     { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ الملصقات ممنوعة');         return; }
-    if (ml.audio    && msg.audio)                       { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ ملفات الصوت ممنوعة');      return; }
-    if (ml.mic      && msg.voice)                       { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ رسائل المايك ممنوعة 🎙');  return; }
-    if (ml.gif      && msg.animation)                   { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ GIF ممنوع');               return; }
-    if (ml.document && msg.document)                    { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ الملفات ممنوعة');          return; }
-    if (ml.poll     && msg.poll)                        { await deleteMsg(env, chatId, msgId); await sendMsg(env, chatId, name + ' ❌ الاستطلاعات ممنوعة 📊');  return; }
+    if (ml.photo    && msg.photo)                     { await deleteMsg(env, chatId, msgId); return; }
+    if (ml.video    && (msg.video || msg.video_note)) { await deleteMsg(env, chatId, msgId); return; }
+    if (ml.sticker  && msg.sticker)                   { await deleteMsg(env, chatId, msgId); return; }
+    if (ml.audio    && msg.audio)                     { await deleteMsg(env, chatId, msgId); return; }
+    if (ml.mic      && msg.voice)                     { await deleteMsg(env, chatId, msgId); return; }
+    if (ml.gif      && msg.animation)                 { await deleteMsg(env, chatId, msgId); return; }
+    if (ml.document && msg.document)                  { await deleteMsg(env, chatId, msgId); return; }
+    if (ml.poll     && msg.poll)                      { await deleteMsg(env, chatId, msgId); return; }
 
     // منع التوجيه
     if (settings.anti_forward && (msg.forward_from || msg.forward_from_chat)) {
