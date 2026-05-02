@@ -712,6 +712,7 @@ async function handleCallback(cb, env) {
   if (data === 'words_' + gChatId) { await setPending(env, userId, null); await showWordsMenu(env, chatId, msgId, gChatId, settings); return; }
   if (data === 'subadmins_' + gChatId) { await setPending(env, userId, null); await showSubAdminsMenu(env, chatId, msgId, gChatId, settings, userId); return; }
   if (data === 'mute_menu_' + gChatId) { await setPending(env, userId, null); await showMuteMenu(env, chatId, msgId, gChatId, settings); return; }
+  if (data === 'slow_menu_' + gChatId) { await setPending(env, userId, null); await showSlowMenu(env, chatId, msgId, gChatId, settings); return; }
 
   // ── إضافة كلمة محظورة ────────────────────────────────────────────────────
   if (data === 'add_word_' + gChatId) {
@@ -825,6 +826,21 @@ async function handleCallback(cb, env) {
     return;
   }
 
+  // ── وضع الكتمان المؤقت (Slow Mode) ───────────────────────────────────────
+  if (data.startsWith('slow_set_')) {
+    const withoutPrefix = data.replace('slow_set_', '');
+    const firstUnder = withoutPrefix.indexOf('_');
+    const delaySecs = parseInt(withoutPrefix.substring(0, firstUnder));
+    const sGChatId = withoutPrefix.substring(firstUnder + 1);
+    if (!await isAuthorized(env, sGChatId, userId)) return;
+    const sSettings = await getSettings(env, sGChatId);
+    sSettings.slow_mode_delay = delaySecs;
+    await saveSettings(env, sGChatId, sSettings);
+    await setChatSlowModeDelay(env, parseInt(sGChatId), delaySecs);
+    await showSlowMenu(env, chatId, msgId, sGChatId, sSettings);
+    return;
+  }
+
   // ── Toggles ───────────────────────────────────────────────────────────────
 
   const toggles = {
@@ -883,7 +899,7 @@ async function showMainMenu(env, chatId, msgId, gChatId, userId) {
       [{ text: '🌙 الوضع الليلي', callback_data: 'night_' + gChatId }],
       [{ text: '🚫 الكلمات المحظورة', callback_data: 'words_' + gChatId }],
       [{ text: '🔇 إعدادات الكتم', callback_data: 'mute_menu_' + gChatId }],
-      [{ text: '🐢 الوضع البطيء', callback_data: 'slow_menu_' + gChatId }],
+      [{ text: '⏳ وضع الكتمان المؤقت', callback_data: 'slow_menu_' + gChatId }],
       [{ text: '👮 المشرفون الفرعيون', callback_data: 'subadmins_' + gChatId }],
       [{ text: '📌 تثبيت إعلان', callback_data: 'announce_' + gChatId }],
       [{ text: '🔙 رجوع لمجموعاتي', callback_data: 'my_groups' }],
@@ -1029,6 +1045,33 @@ async function showMuteMenu(env, chatId, msgId, gChatId, s) {
       ],
       [{ text: '🔙 رجوع', callback_data: 'menu_' + gChatId }],
     ]}
+  );
+}
+
+async function showSlowMenu(env, chatId, msgId, gChatId, s) {
+  const settings = s || await getSettings(env, gChatId);
+  const cur = settings.slow_mode_delay || 0;
+  const opts = [
+    { label: '❌ إيقاف', val: 0 },
+    { label: '10 ثوانٍ', val: 10 },
+    { label: '30 ثانية', val: 30 },
+    { label: 'دقيقة واحدة', val: 60 },
+    { label: '5 دقائق', val: 300 },
+    { label: '10 دقائق', val: 600 },
+    { label: 'ساعة', val: 3600 },
+  ];
+  const sel = (v, l) => cur === v ? '◀ ' + l + ' ▶' : l;
+  const rows = [];
+  for (let i = 0; i < opts.length; i += 2) {
+    const row = [{ text: sel(opts[i].val, opts[i].label), callback_data: 'slow_set_' + opts[i].val + '_' + gChatId }];
+    if (opts[i + 1]) row.push({ text: sel(opts[i + 1].val, opts[i + 1].label), callback_data: 'slow_set_' + opts[i + 1].val + '_' + gChatId });
+    rows.push(row);
+  }
+  rows.push([{ text: '🔙 رجوع', callback_data: 'menu_' + gChatId }]);
+  const statusLabel = cur === 0 ? '❌ متوقف' : (opts.find(o => o.val === cur)?.label || cur + ' ثانية');
+  await editMsg(env, chatId, msgId,
+    '⏳ وضع الكتمان المؤقت\n\nيجبر الأعضاء على الانتظار بين كل رسالة وأخرى\nالعداد يظهر تلقائياً في شريط الكتابة لدى الأعضاء\n\nالحالة الحالية: ' + statusLabel,
+    { inline_keyboard: rows }
   );
 }
 
@@ -1180,6 +1223,10 @@ async function setChatPermissions(env, chatId, canSend) {
     can_change_info: false,
   };
   await fetch(API(env) + '/setChatPermissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, permissions: perms }) });
+}
+
+async function setChatSlowModeDelay(env, chatId, delay) {
+  await fetch(API(env) + '/setChatSlowModeDelay', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, slow_mode_delay: delay }) });
 }
 
 async function applyMediaPermissions(env, chatId, settings) {
