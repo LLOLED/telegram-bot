@@ -843,8 +843,10 @@ async function handleCallback(cb, env) {
     ['tvideo_' + gChatId]: () => { settings.media_lock.video = !settings.media_lock.video; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
     ['tsticker_' + gChatId]: () => { settings.media_lock.sticker = !settings.media_lock.sticker; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
     ['taudio_' + gChatId]: () => { settings.media_lock.audio = !settings.media_lock.audio; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tmic_' + gChatId]: () => { settings.media_lock.mic = !settings.media_lock.mic; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
     ['tgif_' + gChatId]: () => { settings.media_lock.gif = !settings.media_lock.gif; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
     ['tdoc_' + gChatId]: () => { settings.media_lock.document = !settings.media_lock.document; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tpoll_' + gChatId]: () => { settings.media_lock.poll = !settings.media_lock.poll; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
   };
 
   if (data.startsWith('wmax_')) {
