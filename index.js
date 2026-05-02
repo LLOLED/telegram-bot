@@ -928,15 +928,15 @@ async function handleCallback(cb, env) {
     ['twarns_'     + gChatId]: () => { settings.warnings_enabled     = !settings.warnings_enabled;     return () => showWarnsMenu(env, chatId, msgId, gChatId, settings); },
     // الوضع الليلي
     ['tnight_'     + gChatId]: () => { settings.night_mode.enabled   = !settings.night_mode.enabled;   return () => showNightMenu(env, chatId, msgId, gChatId, settings); },
-    // الوسائط — كل نوع بشكل مستقل
-    ['tphoto_'     + gChatId]: () => { settings.media_lock.photo    = !settings.media_lock.photo;    return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tvideo_'     + gChatId]: () => { settings.media_lock.video    = !settings.media_lock.video;    return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tsticker_'   + gChatId]: () => { settings.media_lock.sticker  = !settings.media_lock.sticker;  return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['taudio_'     + gChatId]: () => { settings.media_lock.audio    = !settings.media_lock.audio;    return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tmic_'       + gChatId]: () => { settings.media_lock.mic      = !settings.media_lock.mic;      return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tgif_'       + gChatId]: () => { settings.media_lock.gif      = !settings.media_lock.gif;      return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tdoc_'       + gChatId]: () => { settings.media_lock.document = !settings.media_lock.document; return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
-    ['tpoll_'      + gChatId]: () => { settings.media_lock.poll     = !settings.media_lock.poll;     return () => showMediaMenu(env, chatId, msgId, gChatId, settings); },
+    // الوسائط — كل نوع بشكل مستقل + تطبيق على صلاحيات المجموعة فوراً
+    ['tphoto_'     + gChatId]: () => { settings.media_lock.photo    = !settings.media_lock.photo;    return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tvideo_'     + gChatId]: () => { settings.media_lock.video    = !settings.media_lock.video;    return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tsticker_'   + gChatId]: () => { settings.media_lock.sticker  = !settings.media_lock.sticker;  return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['taudio_'     + gChatId]: () => { settings.media_lock.audio    = !settings.media_lock.audio;    return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tmic_'       + gChatId]: () => { settings.media_lock.mic      = !settings.media_lock.mic;      return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tgif_'       + gChatId]: () => { settings.media_lock.gif      = !settings.media_lock.gif;      return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tdoc_'       + gChatId]: () => { settings.media_lock.document = !settings.media_lock.document; return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
+    ['tpoll_'      + gChatId]: () => { settings.media_lock.poll     = !settings.media_lock.poll;     return async () => { await applyMediaPermissions(env, parseInt(gChatId), settings); await showMediaMenu(env, chatId, msgId, gChatId, settings); }; },
   };
 
   if (toggles[data]) {
@@ -1284,10 +1284,39 @@ async function restrictUser(env, chatId, userId, canSend, duration) {
 async function setChatPermissions(env, chatId, canSend) {
   const perms = {
     can_send_messages:         canSend,
-    can_send_media_messages:   canSend,
+    can_send_audios:           canSend,
+    can_send_documents:        canSend,
+    can_send_photos:           canSend,
+    can_send_videos:           canSend,
+    can_send_video_notes:      canSend,
+    can_send_voice_notes:      canSend,
+    can_send_polls:            canSend,
     can_send_other_messages:   canSend,
     can_add_web_page_previews: canSend,
-    can_send_polls:            canSend,
+    can_invite_users:          true,
+    can_pin_messages:          false,
+    can_change_info:           false,
+  };
+  return tgPost(env, 'setChatPermissions', { chat_id: chatId, permissions: perms });
+}
+
+// تطبيق قفل الوسائط على صلاحيات المجموعة مباشرة (Bot API 6.0+)
+// الأعضاء لن يتمكنوا من إرسال الوسائط المحظورة من الأساس
+async function applyMediaPermissions(env, chatId, settings) {
+  if (settings.group_locked) return; // المجموعة مقفلة بالكامل مسبقاً
+  const ml = settings.media_lock;
+  const perms = {
+    can_send_messages:         true,           // النصوص دائماً مسموحة
+    can_send_photos:           !ml.photo,      // صور
+    can_send_videos:           !ml.video,      // فيديو
+    can_send_video_notes:      !ml.video,      // فيديو دائري
+    can_send_audios:           !ml.audio,      // ملفات صوت
+    can_send_voice_notes:      !ml.mic,        // رسائل مايك
+    can_send_documents:        !ml.document,   // ملفات
+    can_send_polls:            !ml.poll,       // استطلاعات
+    // الملصقات والـ GIF تشتركان في نفس الصلاحية
+    can_send_other_messages:   !(ml.sticker || ml.gif),
+    can_add_web_page_previews: true,
     can_invite_users:          true,
     can_pin_messages:          false,
     can_change_info:           false,
