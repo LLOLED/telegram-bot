@@ -10,3 +10,6 @@ id = "ce22ecdbcb8f4452b97aaf397d2c262a"
 [[kv_namespaces]]
 binding = "USER_DATA"
 id = "529912fd4423451ca978997c57dca71b"
+
+[triggers]
+crons = ["0 * * * *"]
