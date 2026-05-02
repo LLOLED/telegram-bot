@@ -1,0 +1,12 @@
+name = "telegram-bot"
+main = "index.js"
+compatibility_date = "2026-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[kv_namespaces]]
+binding = "GROUP_SETTINGS"
+id = "ce22ecdbcb8f4452b97aaf397d2c262a"
+
+[[kv_namespaces]]
+binding = "USER_DATA"
+id = "529912fd4423451ca978997c57dca71b"
