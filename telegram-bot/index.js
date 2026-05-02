@@ -1029,7 +1029,7 @@ async function applyWarning(env, chatId, userId, firstName, settings) {
     await setWarnings(env, chatId, userId, 0);
     if (settings.warn_action === 'ban') { await banUser(env, chatId, userId); return 'تم حظر ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
     if (settings.warn_action === 'kick') { await kickUser(env, chatId, userId); return 'تم طرد ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
-    if (settings.warn_action === 'mute') { await restrictUser(env, chatId, userId, false, 86400); return 'تم كتم ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
+    if (settings.warn_action === 'mute') { const muteDur = settings.default_mute_duration || 3600; await restrictUser(env, chatId, userId, false, muteDur); return 'تم كتم ' + esc(firstName) + ' بعد ' + settings.max_warnings + ' إنذارات'; }
   }
   return '⚠️ إنذار ' + warns + '/' + settings.max_warnings + ' لـ ' + esc(firstName);
 }
